@@ -418,8 +418,7 @@ echo "ALIAS_reindex"
 echo "mnstats"
 fi
 echo ""
-echo "Made by lobo with the help of all Transcendence team "
-echo "Transcendence Address for donations: GWe4v6A6tLg9pHYEN5MoAsYLTadtefd9o6"
-echo "Bitcoin Address for donations: 1NqYjVMA5DhuLytt33HYgP5qBajeHLYn4d"
+echo "Made by Kriptoman"
+echo "Transcendence donations: GPN1TfeKBr4CN2b4znigohGf1bLxoxLNVP"
 exec bash
 exit
