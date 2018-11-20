@@ -35,7 +35,7 @@ fi
 if [[ $gateway3 = *"64"* ]]; then
   gateway=${gateway3::-3}
 fi
-IP4COUNT=$(find /root/.transcendence_* -maxdepth 0 -type d | wc -l)
+IP4COUNT=$(find /usr/share/.transcendence_* -maxdepth 0 -type d | wc -l)
 function configure_systemd() {
   cat << EOF > /etc/systemd/system/transcendenced$ALIAS.service
 [Unit]
@@ -45,9 +45,9 @@ After=network.target
 User=root
 Group=root
  Type=forking
-#PIDFile=/root/.transcendence_$ALIAS/transcendenced.pid
- ExecStart=/root/bin/transcendenced_$ALIAS.sh
-ExecStop=-/root/bin/transcendence-cli_$ALIAS.sh stop
+#PIDFile=/var/run/.transcendence_$ALIAS.pid
+ ExecStart=/usr/bin/transcendenced_$ALIAS.sh
+ExecStop=-/usr/bin/transcendence-cli_$ALIAS.sh stop
  Restart=always
 PrivateTmp=true
 TimeoutStopSec=60s
@@ -82,7 +82,7 @@ read DO
 echo ""
 if [ $DO = "4" ]
 then
-ALIASES=$(find /root/.transcendence_* -maxdepth 0 -type d | cut -c22-)
+ALIASES=$(find /usr/share/.transcendence_* -maxdepth 0 -type d | cut -c22-)
 echo -e "${GREEN}${ALIASES}${NC}"
 echo ""
 echo "1 - Create new nodes"
@@ -102,11 +102,11 @@ read ALIAS
   sed -i '/$ALIAS/d' .bashrc
   sleep 1
   ## Config Alias
-  echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS masternode status\"" >> .bashrc
-  echo "alias ${ALIAS}_stop=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS stop && systemctl stop transcendenced$ALIAS\"" >> .bashrc
-  echo "alias ${ALIAS}_start=\"/root/bin/transcendenced_${ALIAS}.sh && systemctl start transcendenced$ALIAS\""  >> .bashrc
-  echo "alias ${ALIAS}_config=\"nano /root/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
-  echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS getinfo\"" >> .bashrc
+  echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS masternode status\"" >> .bashrc
+  echo "alias ${ALIAS}_stop=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS stop && systemctl stop transcendenced$ALIAS\"" >> .bashrc
+  echo "alias ${ALIAS}_start=\"/usr/bin/transcendenced_${ALIAS}.sh && systemctl start transcendenced$ALIAS\""  >> .bashrc
+  echo "alias ${ALIAS}_config=\"nano /usr/share/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
+  echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS getinfo\"" >> .bashrc
   configure_systemd
   sleep 1
   source .bashrc
@@ -126,10 +126,10 @@ rm /etc/systemd/system/transcendenced${ALIASD}.service >/dev/null 2>&1
 systemctl daemon-reload >/dev/null 2>&1
 systemctl reset-failed >/dev/null 2>&1
 ## Stopping node
-transcendence-cli -datadir=/root/.transcendence_$ALIASD stop >/dev/null 2>&1
+transcendence-cli -datadir=/usr/share/.transcendence_$ALIASD stop >/dev/null 2>&1
 sleep 5
 ## Removing monit and directory
-rm /root/.transcendence_$ALIASD -r >/dev/null 2>&1
+rm /usr/share/.transcendence_$ALIASD -r >/dev/null 2>&1
 sed -i '/$ALIASD/d' .bashrc >/dev/null 2>&1
 sleep 1
 sed -i '/$ALIASD/d' /etc/monit/monitrc >/dev/null 2>&1
@@ -156,6 +156,10 @@ then
 echo ""
 echo "Enter max connections value"
 read MAXC
+echo ""
+echo "Enter SWAP size (For 2 GB enter only 2)"
+read SS
+swapsize=$(expr $SS \* 1000)
 fi
 if [ $DOSETUP = "y" ]
 then
@@ -168,7 +172,7 @@ then
   cd /var
   sudo touch swap.img
   sudo chmod 600 swap.img
-  sudo dd if=/dev/zero of=/var/swap.img bs=1024k count=2000
+  sudo dd if=/dev/zero of=/var/swap.img bs=1024k count=$swapsize
   sudo mkswap /var/swap.img 
   sudo swapon /var/swap.img 
   sudo free 
@@ -176,19 +180,18 @@ then
   cd
  if [ ! -f Linux.zip ]
   then
-  wget https://github.com/phoenixkonsole/transcendence/releases/download/v1.1.0.0/Linux.zip  
+  wget https://github.com/phoenixkonsole/transcendence/releases/download/v1.1.0.0/Linux.zip
  fi
   unzip Linux.zip 
   chmod +x Linux/bin/* 
-  sudo mv  Linux/bin/* /usr/local/bin
+  sudo mv  Linux/bin/* /usr/bin/
   rm -rf Linux.zip Windows Linux Mac
   sudo apt-get install -y ufw 
   sudo ufw allow ssh/tcp 
   sudo ufw limit ssh/tcp 
   sudo ufw logging on
   echo "y" | sudo ufw enable 
-  mkdir -p ~/bin 
-  echo 'export PATH=~/bin:$PATH' > ~/.bash_aliases
+  echo 'export PATH=/usr/bin:$PATH' > ~/.bash_aliases
   source ~/.bashrc
   echo ""
 fi
@@ -217,7 +220,7 @@ then
   echo ""
   echo "Enter alias for new node"
   read ALIAS
-  CONF_DIR=~/.transcendence_$ALIAS
+  CONF_DIR=/usr/share/.transcendence_$ALIAS
   echo ""
   echo "Enter masternode private key for node $ALIAS"
   read PRIVKEY
@@ -227,15 +230,15 @@ then
 	echo "Enter port for $ALIAS"
 	read PORTD
   fi
-  mkdir ~/.transcendence_$ALIAS
-  unzip DynamicChain.zip -d ~/.transcendence_$ALIAS >/dev/null 2>&1
-  echo '#!/bin/bash' > ~/bin/transcendenced_$ALIAS.sh
-  echo "transcendenced -daemon -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendenced_$ALIAS.sh
-  echo '#!/bin/bash' > ~/bin/transcendence-cli_$ALIAS.sh
-  echo "transcendence-cli -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendence-cli_$ALIAS.sh
-  echo '#!/bin/bash' > ~/bin/transcendence-tx_$ALIAS.sh
-  echo "transcendence-tx -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendence-tx_$ALIAS.sh
-  chmod 755 ~/bin/transcendence*.sh
+  mkdir /usr/share/.transcendence_$ALIAS
+  unzip DynamicChain.zip -d /usr/share/.transcendence_$ALIAS >/dev/null 2>&1
+  echo '#!/bin/bash' > /usr/bin/transcendenced_$ALIAS.sh
+  echo "transcendenced -daemon -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendenced_$ALIAS.sh
+  echo '#!/bin/bash' > /usr/bin/transcendence-cli_$ALIAS.sh
+  echo "transcendence-cli -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendence-cli_$ALIAS.sh
+  echo '#!/bin/bash' > /usr/bin/transcendence-tx_$ALIAS.sh
+  echo "transcendence-tx -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendence-tx_$ALIAS.sh
+  chmod 755 /usr/bin/transcendence*.sh
   mkdir -p $CONF_DIR
   echo "rpcuser=user"`shuf -i 100000-10000000 -n 1` >> transcendence.conf_TEMP
   echo "rpcpassword=pass"`shuf -i 100000-10000000 -n 1` >> transcendence.conf_TEMP
@@ -261,13 +264,13 @@ then
   mv transcendence.conf_TEMP $CONF_DIR/transcendence.conf
   echo ""
   echo -e "Your ip is ${GREEN}$IP4:$PORT${NC}"
-	echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS masternode status\"" >> .bashrc
+	echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS masternode status\"" >> .bashrc
 	echo "alias ${ALIAS}_stop=\"systemctl stop transcendenced$ALIAS\"" >> .bashrc
 	echo "alias ${ALIAS}_start=\"systemctl start transcendenced$ALIAS\""  >> .bashrc
-	echo "alias ${ALIAS}_config=\"nano /root/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
-	echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS getinfo\"" >> .bashrc
-	echo "alias ${ALIAS}_resync=\"/root/bin/transcendenced_$ALIAS.sh -resync\"" >> .bashrc
-	echo "alias ${ALIAS}_reindex=\"/root/bin/transcendenced_$ALIAS.sh -reindex\"" >> .bashrc
+	echo "alias ${ALIAS}_config=\"nano /usr/share/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
+	echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS getinfo\"" >> .bashrc
+	echo "alias ${ALIAS}_resync=\"/usr/bin/transcendenced_$ALIAS.sh -resync\"" >> .bashrc
+	echo "alias ${ALIAS}_reindex=\"/usr/bin/transcendenced_$ALIAS.sh -reindex\"" >> .bashrc
 	echo "alias ${ALIAS}_restart=\"systemctl restart transcendenced$ALIAS\""  >> .bashrc
 
 	## Config Systemctl
@@ -290,7 +293,7 @@ while [  $COUNTER -lt $MNCOUNT ]; do
   echo ""
   echo "Enter alias for new node"
   read ALIAS
-  CONF_DIR=~/.transcendence_$ALIAS
+  CONF_DIR=/usr/share/.transcendence_$ALIAS
   echo ""
   echo "Enter masternode private key for node $ALIAS"
   read PRIVKEY
@@ -300,15 +303,15 @@ while [  $COUNTER -lt $MNCOUNT ]; do
 	echo "Enter port for $ALIAS"
 	read PORTD
   fi
-  mkdir ~/.transcendence_$ALIAS
-  unzip DynamicChain.zip -d ~/.transcendence_$ALIAS >/dev/null 2>&1
-  echo '#!/bin/bash' > ~/bin/transcendenced_$ALIAS.sh
-  echo "transcendenced -daemon -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendenced_$ALIAS.sh
+  mkdir /usr/share/.transcendence_$ALIAS
+  unzip DynamicChain.zip -d /usr/share/.transcendence_$ALIAS >/dev/null 2>&1
+  echo '#!/bin/bash' > /usr/bin/transcendenced_$ALIAS.sh
+  echo "transcendenced -daemon -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendenced_$ALIAS.sh
   echo '#!/bin/bash' > ~/bin/transcendence-cli_$ALIAS.sh
-  echo "transcendence-cli -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendence-cli_$ALIAS.sh
-  echo '#!/bin/bash' > ~/bin/transcendence-tx_$ALIAS.sh
-  echo "transcendence-tx -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> ~/bin/transcendence-tx_$ALIAS.sh
-  chmod 755 ~/bin/transcendence*.sh
+  echo "transcendence-cli -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendence-cli_$ALIAS.sh
+  echo '#!/bin/bash' > /usr/bin/transcendence-tx_$ALIAS.sh
+  echo "transcendence-tx -conf=$CONF_DIR/transcendence.conf -datadir=$CONF_DIR "'$*' >> /usr/bin/transcendence-tx_$ALIAS.sh
+  chmod 755 /usr/bin/transcendence*.sh
   mkdir -p $CONF_DIR
   echo "rpcuser=user"`shuf -i 100000-10000000 -n 1` >> transcendence.conf_TEMP
   echo "rpcpassword=pass"`shuf -i 100000-10000000 -n 1` >> transcendence.conf_TEMP
@@ -334,13 +337,13 @@ while [  $COUNTER -lt $MNCOUNT ]; do
   mv transcendence.conf_TEMP $CONF_DIR/transcendence.conf
   echo ""
   echo -e "Your ip is ${GREEN}[${gateway}$COUNTER]:${PORT}${NC}"
-	echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS masternode status\"" >> .bashrc
+	echo "alias ${ALIAS}_status=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS masternode status\"" >> .bashrc
 	echo "alias ${ALIAS}_stop=\"systemctl stop transcendenced$ALIAS\"" >> .bashrc
 	echo "alias ${ALIAS}_start=\"systemctl start transcendenced$ALIAS\""  >> .bashrc
-	echo "alias ${ALIAS}_config=\"nano /root/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
-	echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/root/.transcendence_$ALIAS getinfo\"" >> .bashrc
-	echo "alias ${ALIAS}_resync=\"/root/bin/transcendenced_$ALIAS.sh -resync\"" >> .bashrc
-	echo "alias ${ALIAS}_reindex=\"/root/bin/transcendenced_$ALIAS.sh -reindex\"" >> .bashrc
+	echo "alias ${ALIAS}_config=\"nano /usr/share/.transcendence_${ALIAS}/transcendence.conf\""  >> .bashrc
+	echo "alias ${ALIAS}_getinfo=\"transcendence-cli -datadir=/usr/share/.transcendence_$ALIAS getinfo\"" >> .bashrc
+	echo "alias ${ALIAS}_resync=\"/usr/bin/transcendenced_$ALIAS.sh -resync\"" >> .bashrc
+	echo "alias ${ALIAS}_reindex=\"/usr/bin/transcendenced_$ALIAS.sh -reindex\"" >> .bashrc
 	echo "alias ${ALIAS}_restart=\"systemctl restart transcendenced$ALIAS\""  >> .bashrc
 	## Config Systemctl
 	configure_systemd
